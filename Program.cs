@@ -1,8 +1,15 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Identity.Web;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+builder.Services.AddAuthorization();
 
 const string FrontendCorsPolicy = "FrontendCorsPolicy";
 builder.Services.AddCors(options =>
@@ -25,6 +32,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors(FrontendCorsPolicy);
+app.UseAuthentication();
+app.UseAuthorization();
 
 // var summaries = new[]
 // {
@@ -48,8 +57,10 @@ app.UseCors(FrontendCorsPolicy);
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
     .WithName("Health");
 
-app.MapPost("/pagos", (PaymentRequest request) =>
+app.MapPost("/pagos", (PaymentRequest request, ILogger<Program> logger) =>
 {
+    logger.LogInformation("Pago recibido: {Referencia} por {Monto}", request.Referencia, request.Monto);
+
     if (request.Monto <= 0)
     {
         return Results.BadRequest(new { error = "El monto debe ser mayor a 0" });
@@ -62,7 +73,8 @@ app.MapPost("/pagos", (PaymentRequest request) =>
         estado = "recibido"
     });
 })
-.WithName("CrearPago");
+.WithName("CrearPago")
+.RequireAuthorization();
 
 app.Run();
 
